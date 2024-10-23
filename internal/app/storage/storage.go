@@ -15,10 +15,10 @@ const (
 )
 
 type User struct {
-	userID   string
-	login    string
-	password string
-	balance  int64
+	UserID   string
+	Login    string
+	Password string
+	Balance  int64
 }
 
 type Order struct {
@@ -42,6 +42,7 @@ type Storage interface {
 	AddUser(ctx context.Context, user User) (bool, error)
 	GetUser(ctx context.Context, userID string) (User, error)
 	GetUserID(ctx context.Context, login, password string) (string, error)
+	CheckUser(ctx context.Context, login string) (exists bool, err error)
 	UpdateUser(ctx context.Context, user User) (bool, error)
 
 	AddOrder(ctx context.Context, order Order) (bool, error)
