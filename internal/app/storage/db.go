@@ -3,7 +3,10 @@ package storage
 import (
 	"context"
 	"database/sql"
+
 	"fmt"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type DBStorage struct {
@@ -12,11 +15,11 @@ type DBStorage struct {
 
 var initlist = map[string]string{
 	"createUsers":            "CREATE TABLE IF NOT EXISTS users (login TEXT UNIQUE PRIMARY KEY, password TEXT, user_id TEXT UNIQUE, balance INTEGER);",
-	"createOrders":           "CREATE TABLE IF NOT EXISTS orders (order_id TEXT UNIQUE PRIMARY KEY, userID TEXT, accrual INTEGER, status TEXT, uploaded_at DATETIME DEFAULT NOW());",
-	"createWithdrawals":      "CREATE TABLE IF NOT EXISTS withdrawal (order_id TEXT UNIQUE PRIMARY KEY, userID TEXT, sum INTEGER, processed_at DATETIME);",
+	"createOrders":           "CREATE TABLE IF NOT EXISTS orders (order_id TEXT UNIQUE PRIMARY KEY, user_id TEXT, accrual INTEGER, status TEXT, uploaded_at TIMESTAMP DEFAULT NOW());",
+	"createWithdrawals":      "CREATE TABLE IF NOT EXISTS withdrawals (order_id TEXT UNIQUE PRIMARY KEY, user_id TEXT, sum INTEGER, processed_at TIMESTAMP);",
 	"indexUsersUserId":       "CREATE INDEX IF NOT EXISTS users__user_id ON users (user_id);",
 	"indexOrdersUserId":      "CREATE INDEX IF NOT EXISTS orders__user_id ON orders (user_id);",
-	"indexWithdrawalsUserId": "CREATE INDEX IF NOT EXISTS withdrawals__user_id ON withdrawals (user_id)",
+	"indexWithdrawalsUserId": "CREATE INDEX IF NOT EXISTS withdrawals__user_id ON withdrawals (user_id);",
 }
 
 func NewDBStorage(conn string) (*DBStorage, error) {
@@ -27,9 +30,9 @@ func NewDBStorage(conn string) (*DBStorage, error) {
 	return &DBStorage{db}, nil
 }
 
-func (s *DBStorage) Init(ctx context.Context) error {
+func (s *DBStorage) Init() error {
 	for name, query := range initlist {
-		_, err := s.db.ExecContext(ctx, query)
+		_, err := s.db.Exec(query)
 		if err != nil {
 			return fmt.Errorf("failed to init during %s, err: %w", name, err)
 		}
@@ -71,7 +74,7 @@ func (s *DBStorage) GetUserID(ctx context.Context, login, password string) (stri
 func (s *DBStorage) CheckUser(ctx context.Context, login string) (exists bool, err error) {
 	row := s.db.QueryRowContext(ctx, "SELECT user_id FROM users WHERE login = $1", login)
 	var userID string
-	if err := row.Scan(&userID); err != nil {
+	if err := row.Scan(&userID); err != nil && err != sql.ErrNoRows {
 		return false, err
 	}
 	return len(userID) > 0, nil

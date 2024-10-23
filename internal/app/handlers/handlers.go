@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type Handlers struct {
@@ -24,6 +25,17 @@ type Error struct {
 	err  error
 	msg  string
 	code int
+}
+
+func H(f func(http.ResponseWriter, *http.Request) Error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		result := f(w, r)
+		if result.err != nil {
+			message := result.msg + ": " + result.err.Error()
+			log.Error().Msg(message)
+			http.Error(w, message, result.code)
+		}
+	}
 }
 
 func (h Handlers) Register(res http.ResponseWriter, req *http.Request) Error {

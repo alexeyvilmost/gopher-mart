@@ -37,7 +37,7 @@ type Withdrawal struct {
 }
 
 type Storage interface {
-	Init(ctx context.Context) error
+	Init() error
 
 	AddUser(ctx context.Context, user User) (bool, error)
 	GetUser(ctx context.Context, userID string) (User, error)
@@ -45,11 +45,11 @@ type Storage interface {
 	CheckUser(ctx context.Context, login string) (exists bool, err error)
 	UpdateUser(ctx context.Context, user User) (bool, error)
 
-	AddOrder(ctx context.Context, order Order) (bool, error)
-	GetOrders(ctx context.Context, userID string) ([]Order, error)
-	UpdateOrder(ctx context.Context, order Order) (bool, error)
+	// AddOrder(ctx context.Context, order Order) (bool, error)
+	// GetOrders(ctx context.Context, userID string) ([]Order, error)
+	// UpdateOrder(ctx context.Context, order Order) (bool, error)
 
-	AddWithdrawal(ctx context.Context, wd Withdrawal) (bool, error)
-	GetWithdrawals(ctx context.Context, userID string) ([]Withdrawal, error)
-	UpdateWithdrawal(ctx context.Context, wd Withdrawal) (bool, error)
+	// AddWithdrawal(ctx context.Context, wd Withdrawal) (bool, error)
+	// GetWithdrawals(ctx context.Context, userID string) ([]Withdrawal, error)
+	// UpdateWithdrawal(ctx context.Context, wd Withdrawal) (bool, error)
 }
