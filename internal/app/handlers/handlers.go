@@ -16,7 +16,7 @@ type Handlers struct {
 	BaseURL string
 }
 
-type RegisterRequest struct {
+type AuthRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
@@ -40,7 +40,7 @@ func H(f func(http.ResponseWriter, *http.Request) Error) http.HandlerFunc {
 
 func (h Handlers) Register(res http.ResponseWriter, req *http.Request) Error {
 	decoder := json.NewDecoder(req.Body)
-	var reg RegisterRequest
+	var reg AuthRequest
 	err := decoder.Decode(&reg)
 	if err != nil {
 		return Error{err: err, msg: "Не удалось распарсить запрос", code: http.StatusBadRequest}
@@ -63,6 +63,29 @@ func (h Handlers) Register(res http.ResponseWriter, req *http.Request) Error {
 	ok, err := h.Storage.AddUser(req.Context(), user)
 	if err != nil || !ok {
 		return Error{err: err, msg: "Не удалось зарегистрировать пользователя", code: http.StatusInternalServerError}
+	}
+
+	auth.AddAuth(res, userID)
+	res.WriteHeader(http.StatusOK)
+	return Error{}
+}
+
+func (h Handlers) Login(res http.ResponseWriter, req *http.Request) Error {
+	decoder := json.NewDecoder(req.Body)
+	var log AuthRequest
+	err := decoder.Decode(&log)
+	if err != nil {
+		return Error{err: err, msg: "Не удалось распарсить запрос", code: http.StatusBadRequest}
+	}
+
+	userID, err := h.Storage.GetUserID(req.Context(), log.Login, log.Password)
+	switch err {
+	case nil:
+		// pass
+	case storage.ErrEmpty:
+		return Error{err: err, msg: "Неверная пара логин/пароль", code: http.StatusUnauthorized}
+	default:
+		return Error{err: err, msg: "Внутренняя ошибка сервера", code: http.StatusInternalServerError}
 	}
 
 	auth.AddAuth(res, userID)

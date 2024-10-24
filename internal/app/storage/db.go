@@ -22,6 +22,8 @@ var initlist = map[string]string{
 	"indexWithdrawalsUserId": "CREATE INDEX IF NOT EXISTS withdrawals__user_id ON withdrawals (user_id);",
 }
 
+var ErrEmpty = fmt.Errorf("empty db response")
+
 func NewDBStorage(conn string) (*DBStorage, error) {
 	db, err := sql.Open("pgx", conn)
 	if err != nil {
@@ -66,6 +68,9 @@ func (s *DBStorage) GetUserID(ctx context.Context, login, password string) (stri
 	row := s.db.QueryRowContext(ctx, "SELECT user_id FROM users WHERE login = $1 AND password = $2;", login, password)
 	var userID string
 	if err := row.Scan(&userID); err != nil {
+		if err == sql.ErrNoRows {
+			return "", ErrEmpty
+		}
 		return "", err
 	}
 	return userID, nil

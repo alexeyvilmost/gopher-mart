@@ -29,6 +29,7 @@ func StartServer() error {
 	r := chi.NewRouter()
 	r.Use()
 	r.Post("/register", handlers.H(h.Register))
+	r.Post("/login", handlers.H(h.Login))
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
