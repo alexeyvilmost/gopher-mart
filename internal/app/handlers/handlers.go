@@ -45,12 +45,13 @@ func (h Handlers) Register(res http.ResponseWriter, req *http.Request) Error {
 	if err != nil {
 		return Error{err: err, msg: "Не удалось распарсить запрос", code: http.StatusBadRequest}
 	}
+
 	exists, err := h.Storage.CheckUser(req.Context(), reg.Login)
 	if err != nil {
 		return Error{err: err, msg: "Не удалось проверить наличие пользователя в системе", code: http.StatusInternalServerError}
 	}
 	if exists {
-		return Error{err: err, msg: fmt.Sprintf("Логин %s уже занят", reg.Login), code: http.StatusConflict}
+		return Error{err: fmt.Errorf(""), msg: fmt.Sprintf("Логин %s уже занят", reg.Login), code: http.StatusConflict}
 	}
 	userID := uuid.NewString()
 	user := storage.User{

@@ -72,12 +72,15 @@ func (s *DBStorage) GetUserID(ctx context.Context, login, password string) (stri
 }
 
 func (s *DBStorage) CheckUser(ctx context.Context, login string) (exists bool, err error) {
-	row := s.db.QueryRowContext(ctx, "SELECT user_id FROM users WHERE login = $1", login)
+	row := s.db.QueryRowContext(ctx, "SELECT user_id FROM users WHERE login = $1;", login)
 	var userID string
-	if err := row.Scan(&userID); err != nil && err != sql.ErrNoRows {
+	if err := row.Scan(&userID); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
 		return false, err
 	}
-	return len(userID) > 0, nil
+	return true, nil
 }
 
 func (s *DBStorage) UpdateUser(ctx context.Context, user User) (bool, error) {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"gophermart/internal/app/handlers"
 	"gophermart/internal/app/storage"
 	"net/http"
@@ -11,7 +12,9 @@ import (
 )
 
 func StartServer() error {
-	storage, err := storage.NewDBStorage("port=5432 user=app dbname=shortener password=app host=localhost")
+	cfg := NewConfig()
+
+	storage, err := storage.NewDBStorage(cfg.DBConnection)
 	if err != nil {
 		log.Error().Err(err).Msg("Error while creating storage")
 		return err
@@ -28,6 +31,8 @@ func StartServer() error {
 	r.Post("/register", handlers.H(h.Register))
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	err = http.ListenAndServe("localhost:8080", r)
+
+	log.Info().Msg(fmt.Sprintf("Server listening on address %s", cfg.RunAddress))
+	err = http.ListenAndServe(cfg.RunAddress, r)
 	return err
 }
