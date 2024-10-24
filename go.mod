@@ -22,5 +22,6 @@ require (
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/theplant/luhn v0.0.0-20170224032821-81a1a381387a
 	golang.org/x/sys v0.25.0 // indirect
 )

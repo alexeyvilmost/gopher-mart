@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"gophermart/internal/app/auth"
 	"gophermart/internal/app/storage"
+	"io"
 	"net/http"
+	"strconv"
+
+	"github.com/theplant/luhn"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -13,7 +17,6 @@ import (
 
 type Handlers struct {
 	Storage storage.Storage
-	BaseURL string
 }
 
 type AuthRequest struct {
@@ -90,5 +93,21 @@ func (h Handlers) Login(res http.ResponseWriter, req *http.Request) Error {
 
 	auth.AddAuth(res, userID)
 	res.WriteHeader(http.StatusOK)
+	return Error{}
+}
+
+func (h Handlers) AddOrder(res http.ResponseWriter, req *http.Request) Error {
+	orderID, err := io.ReadAll(req.Body)
+	if err != nil {
+		return Error{err: err, msg: "Не удалось распарсить запрос", code: http.StatusBadRequest}
+	}
+	orderIDNum, err := strconv.Atoi(string(orderID))
+	if err != nil {
+		return Error{err: err, msg: "Некорректный номер заказа", code: http.StatusUnprocessableEntity}
+	}
+	if !luhn.Valid(orderIDNum) {
+		return Error{err: err, msg: "Некорректный номер заказа", code: http.StatusUnprocessableEntity}
+	}
+
 	return Error{}
 }

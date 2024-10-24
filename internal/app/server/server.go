@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"gophermart/internal/app/auth"
 	"gophermart/internal/app/handlers"
 	"gophermart/internal/app/storage"
 	"net/http"
@@ -25,11 +26,12 @@ func StartServer() error {
 		return err
 	}
 	h := handlers.Handlers{Storage: storage}
+	a := auth.Auth{Storage: storage}
 
 	r := chi.NewRouter()
-	r.Use()
 	r.Post("/register", handlers.H(h.Register))
 	r.Post("/login", handlers.H(h.Login))
+	r.Post("/orders", a.WithAuth(handlers.H(h.AddOrder)))
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
