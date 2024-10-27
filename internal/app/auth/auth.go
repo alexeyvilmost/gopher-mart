@@ -78,7 +78,6 @@ func AddAuth(w http.ResponseWriter, userID string) error {
 
 func (a Auth) WithAuth(h http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Info().Msg("da")
 		var token string
 		jwtAuth, err := r.Cookie("jwt_auth")
 		if err != nil {
@@ -90,6 +89,7 @@ func (a Auth) WithAuth(h http.Handler) http.HandlerFunc {
 			return
 		}
 		token = jwtAuth.Value
+		// TOTHINK: Должна ли авторизация проверять существование пользователя?
 
 		userID, err := GetUserID(token)
 		if err != nil {
@@ -97,7 +97,7 @@ func (a Auth) WithAuth(h http.Handler) http.HandlerFunc {
 			http.Error(w, "Unexpected error while get user_id from token", http.StatusInternalServerError)
 			return
 		}
-		r.Header.Set("user-id-auth", userID)
+		r.Header.Set("x-user-id", userID)
 		log.Info().Str("user_id", userID).Msg("")
 		h.ServeHTTP(w, r)
 	})
