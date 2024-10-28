@@ -107,6 +107,14 @@ func (s *DBStorage) AddOrder(ctx context.Context, order Order) error {
 	return nil
 }
 
+func (s *DBStorage) UpdateOrder(ctx context.Context, order Order) error {
+	row := s.db.QueryRowContext(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_id = $3 ON CONFLICT DO NOTHING;", order.Status, order.Accrual, order.OrderID)
+	if row.Err() != nil {
+		return row.Err()
+	}
+	return nil
+}
+
 func (s *DBStorage) CheckOrder(ctx context.Context, userID, orderID string) (exists bool, err error) {
 	row := s.db.QueryRowContext(ctx, "SELECT user_id FROM orders WHERE order_id = $1;", orderID)
 	var orderUserID string
@@ -125,6 +133,23 @@ func (s *DBStorage) CheckOrder(ctx context.Context, userID, orderID string) (exi
 func (s *DBStorage) GetOrders(ctx context.Context, userID string) ([]Order, error) {
 	result := []Order{}
 	rows, err := s.db.QueryContext(ctx, "SELECT order_id, user_id, accrual, status, uploaded_at FROM orders WHERE user_id = $1;", userID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		order := Order{}
+		if err := rows.Scan(&order.OrderID, &order.UserID, &order.Accrual, &order.Status, &order.UploadedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, order)
+	}
+
+	return result, nil
+}
+
+func (s *DBStorage) GetIncompleteOrders(ctx context.Context) ([]Order, error) {
+	result := []Order{}
+	rows, err := s.db.QueryContext(ctx, "SELECT order_id, user_id, accrual, status, uploaded_at FROM orders WHERE status IN('NEW','PROCESSING');")
 	if err != nil {
 		return nil, err
 	}

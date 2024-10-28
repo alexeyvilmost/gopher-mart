@@ -51,9 +51,9 @@ type Storage interface {
 	AddOrder(ctx context.Context, order Order) error
 	GetOrders(ctx context.Context, userID string) ([]Order, error)
 	CheckOrder(ctx context.Context, userID, orderID string) (exists bool, err error)
-	// UpdateOrder(ctx context.Context, order Order) (bool, error)
+	GetIncompleteOrders(ctx context.Context) ([]Order, error)
+	UpdateOrder(ctx context.Context, order Order) error
 
 	AddWithdrawal(ctx context.Context, wd Withdrawal) error
 	GetWithdrawals(ctx context.Context, userID string) ([]Withdrawal, error)
-	// UpdateWithdrawal(ctx context.Context, wd Withdrawal) (bool, error)
 }
