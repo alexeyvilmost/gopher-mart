@@ -19,7 +19,7 @@ type Auth struct {
 	Storage storage.Storage
 }
 
-const tokenExp = time.Hour * 3
+const tokenExp = time.Hour * 3 // TODO: hide
 const secretKey = "supersecretkey"
 
 func BuildJWTString(userID string) (string, error) {

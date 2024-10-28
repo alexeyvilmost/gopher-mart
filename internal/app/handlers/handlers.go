@@ -200,7 +200,7 @@ func (h Handlers) Withdraw(res http.ResponseWriter, req *http.Request) CustomRes
 		return CustomResponse{err: err, msg: "Ошибка при выполнении запроса", code: http.StatusInternalServerError}
 	}
 	wd := storage.Withdrawal{
-		OrderID: r.Order,
+		OrderID: r.Order, // TOTHINK: должна ли эта ручка создавать новый заказ?
 		UserID:  userID,
 		Sum:     r.Sum,
 	}
@@ -225,7 +225,6 @@ func (h Handlers) GetWithdrawals(res http.ResponseWriter, req *http.Request) Cus
 
 	res.Header().Add("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	json.NewEncoder(res).Encode(wds) // TODO: скрыть заказы с accrual = 0
-	// TODO: Формат времени
+	json.NewEncoder(res).Encode(wds)
 	return CustomResponse{}
 }
