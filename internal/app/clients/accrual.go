@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gophermart/internal/app/storage"
+	"gophermart/internal/app/domain"
 	"io"
 	"net/http"
 	"strconv"
@@ -16,9 +16,9 @@ type AccrualClient struct {
 }
 
 type AccrualResponse struct {
-	OrderID string              `json:"order_id"`
-	Status  storage.OrderStatus `json:"status"`
-	Accrual float64             `json:"accrual"`
+	OrderID string             `json:"order_id"`
+	Status  domain.OrderStatus `json:"status"`
+	Accrual float64            `json:"accrual"`
 }
 
 type AccrualError struct {
@@ -34,7 +34,7 @@ func NewAccrualClient(host string) AccrualClient {
 	return AccrualClient{host: host}
 }
 
-func (ac *AccrualClient) GetOrderInfo(order storage.Order) (AccrualResponse, AccrualError) {
+func (ac *AccrualClient) GetOrderInfo(order domain.Order) (AccrualResponse, AccrualError) {
 	uri := ac.host + url + order.OrderID
 	resp, err := http.Get(uri)
 	if err != nil {

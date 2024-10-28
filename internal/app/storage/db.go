@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"gophermart/internal/app/domain"
 
 	"fmt"
 
@@ -14,7 +15,7 @@ type DBStorage struct {
 }
 
 var initlist = map[string]string{
-	"createUsers":       "CREATE TABLE IF NOT EXISTS users (login TEXT UNIQUE PRIMARY KEY, password TEXT, user_id TEXT UNIQUE, balance DECIMAL, withdrawn DECIMAL);",
+	"createUsers":       "CREATE TABLE IF NOT EXISTS users (login TEXT UNIQUE PRIMARY KEY, password INTEGER, user_id TEXT UNIQUE, balance DECIMAL, withdrawn DECIMAL);",
 	"createOrders":      "CREATE TABLE IF NOT EXISTS orders (order_id TEXT UNIQUE PRIMARY KEY, user_id TEXT, accrual INTEGER, status TEXT, uploaded_at TIMESTAMP DEFAULT NOW());",
 	"createWithdrawals": "CREATE TABLE IF NOT EXISTS withdrawals (user_id TEXT UNIQUE PRIMARY KEY, order_id TEXT, sum INTEGER, processed_at TIMESTAMP DEFAULT NOW());",
 	"indexUsersUserId":  "CREATE INDEX IF NOT EXISTS users__user_id ON users (user_id);",
@@ -48,7 +49,7 @@ func (s *DBStorage) Init() error {
 // 	var str string
 // 	err = row.Scan(&str)
 
-func (s *DBStorage) AddUser(ctx context.Context, user User) error {
+func (s *DBStorage) AddUser(ctx context.Context, user domain.User) error {
 	row := s.db.QueryRowContext(ctx, "INSERT INTO users VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING RETURNING user_id;", user.Login, user.Password, user.UserID, user.Balance, user.Withdrawn)
 	var str string
 	if err := row.Scan(&str); err != nil {
@@ -57,16 +58,19 @@ func (s *DBStorage) AddUser(ctx context.Context, user User) error {
 	return nil
 }
 
-func (s *DBStorage) GetUser(ctx context.Context, userID string) (User, error) {
-	user := User{}
+func (s *DBStorage) GetUser(ctx context.Context, userID string) (domain.User, error) {
+	user := domain.User{}
 	row := s.db.QueryRowContext(ctx, "SELECT login, password, user_id, balance, withdrawn FROM users WHERE user_id = $1;", userID)
 	if err := row.Scan(&user.Login, &user.Password, &user.UserID, &user.Balance, &user.Withdrawn); err != nil {
-		return User{}, err
+		if err == sql.ErrNoRows {
+			return domain.User{}, ErrEmpty
+		}
+		return domain.User{}, err
 	}
 	return user, nil
 }
 
-func (s *DBStorage) GetUserID(ctx context.Context, login, password string) (string, error) {
+func (s *DBStorage) GetUserID(ctx context.Context, login string, password uint32) (string, error) {
 	row := s.db.QueryRowContext(ctx, "SELECT user_id FROM users WHERE login = $1 AND password = $2;", login, password)
 	var userID string
 	if err := row.Scan(&userID); err != nil {
@@ -87,10 +91,10 @@ func (s *DBStorage) CheckUser(ctx context.Context, login string) (exists bool, e
 		}
 		return false, err
 	}
-	return true, nil // TODO: remove unused bool's
+	return true, nil
 }
 
-func (s *DBStorage) UpdateUser(ctx context.Context, user User) error {
+func (s *DBStorage) UpdateUser(ctx context.Context, user domain.User) error {
 	row := s.db.QueryRowContext(ctx, "UPDATE users SET balance = $1 WHERE user_id = $2 ON CONFLICT DO NOTHING;", user.Balance, user.UserID)
 	if row.Err() != nil {
 		return row.Err()
@@ -98,7 +102,7 @@ func (s *DBStorage) UpdateUser(ctx context.Context, user User) error {
 	return nil
 }
 
-func (s *DBStorage) AddOrder(ctx context.Context, order Order) error {
+func (s *DBStorage) AddOrder(ctx context.Context, order domain.Order) error {
 	row := s.db.QueryRowContext(ctx, "INSERT INTO orders VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT DO NOTHING RETURNING order_id;", order.OrderID, order.UserID, order.Accrual, string(order.Status))
 	var str string
 	if err := row.Scan(&str); err != nil {
@@ -107,7 +111,7 @@ func (s *DBStorage) AddOrder(ctx context.Context, order Order) error {
 	return nil
 }
 
-func (s *DBStorage) UpdateOrder(ctx context.Context, order Order) error {
+func (s *DBStorage) UpdateOrder(ctx context.Context, order domain.Order) error {
 	row := s.db.QueryRowContext(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_id = $3 ON CONFLICT DO NOTHING;", order.Status, order.Accrual, order.OrderID)
 	if row.Err() != nil {
 		return row.Err()
@@ -127,17 +131,17 @@ func (s *DBStorage) CheckOrder(ctx context.Context, userID, orderID string) (exi
 	if orderUserID != userID {
 		return true, ErrConflict
 	}
-	return true, nil // TODO: remove unused bool's
+	return true, nil
 }
 
-func (s *DBStorage) GetOrders(ctx context.Context, userID string) ([]Order, error) {
-	result := []Order{}
+func (s *DBStorage) GetOrders(ctx context.Context, userID string) ([]domain.Order, error) {
+	result := []domain.Order{}
 	rows, err := s.db.QueryContext(ctx, "SELECT order_id, user_id, accrual, status, uploaded_at FROM orders WHERE user_id = $1;", userID)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		order := Order{}
+		order := domain.Order{}
 		if err := rows.Scan(&order.OrderID, &order.UserID, &order.Accrual, &order.Status, &order.UploadedAt); err != nil {
 			return nil, err
 		}
@@ -147,14 +151,14 @@ func (s *DBStorage) GetOrders(ctx context.Context, userID string) ([]Order, erro
 	return result, nil
 }
 
-func (s *DBStorage) GetIncompleteOrders(ctx context.Context) ([]Order, error) {
-	result := []Order{}
+func (s *DBStorage) GetIncompleteOrders(ctx context.Context) ([]domain.Order, error) {
+	result := []domain.Order{}
 	rows, err := s.db.QueryContext(ctx, "SELECT order_id, user_id, accrual, status, uploaded_at FROM orders WHERE status IN('NEW','PROCESSING');")
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		order := Order{}
+		order := domain.Order{}
 		if err := rows.Scan(&order.OrderID, &order.UserID, &order.Accrual, &order.Status, &order.UploadedAt); err != nil {
 			return nil, err
 		}
@@ -164,7 +168,7 @@ func (s *DBStorage) GetIncompleteOrders(ctx context.Context) ([]Order, error) {
 	return result, nil
 }
 
-func (s *DBStorage) AddWithdrawal(ctx context.Context, wd Withdrawal) error {
+func (s *DBStorage) AddWithdrawal(ctx context.Context, wd domain.Withdrawal) error {
 	row := s.db.QueryRowContext(ctx, "INSERT INTO withdrawals VALUES ($1, $2, $3, NOW()) ON CONFLICT DO NOTHING RETURNING user_id;", wd.UserID, wd.OrderID, wd.Sum)
 	var str string
 	if err := row.Scan(&str); err != nil {
@@ -173,14 +177,14 @@ func (s *DBStorage) AddWithdrawal(ctx context.Context, wd Withdrawal) error {
 	return nil
 }
 
-func (s *DBStorage) GetWithdrawals(ctx context.Context, userID string) ([]Withdrawal, error) {
-	result := []Withdrawal{}
+func (s *DBStorage) GetWithdrawals(ctx context.Context, userID string) ([]domain.Withdrawal, error) {
+	result := []domain.Withdrawal{}
 	rows, err := s.db.QueryContext(ctx, "SELECT order_id, user_id, sum, processed_at FROM withdrawals WHERE user_id = $1;", userID)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		wd := Withdrawal{}
+		wd := domain.Withdrawal{}
 		if err := rows.Scan(&wd.OrderID, &wd.UserID, &wd.Sum, &wd.ProcessedAt); err != nil {
 			return nil, err
 		}

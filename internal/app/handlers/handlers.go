@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gophermart/internal/app/auth"
+	"gophermart/internal/app/domain"
 	"gophermart/internal/app/storage"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 type Handlers struct {
 	Storage storage.Storage
+	Auth    auth.Auth
 }
 
 type AuthRequest struct {
@@ -64,9 +66,9 @@ func (h Handlers) Register(res http.ResponseWriter, req *http.Request) CustomRes
 		return CustomResponse{msg: fmt.Sprintf("Логин %s уже занят", reg.Login), code: http.StatusConflict}
 	}
 	userID := uuid.NewString()
-	user := storage.User{
+	user := domain.User{
 		Login:    reg.Login,
-		Password: reg.Password, // TODO: Hash password
+		Password: auth.Hash(reg.Password),
 		UserID:   userID,
 		Balance:  0,
 	}
@@ -75,7 +77,7 @@ func (h Handlers) Register(res http.ResponseWriter, req *http.Request) CustomRes
 		return CustomResponse{err: err, msg: "Не удалось зарегистрировать пользователя", code: http.StatusInternalServerError}
 	}
 
-	auth.AddAuth(res, userID)
+	h.Auth.AddAuth(res, userID)
 	res.WriteHeader(http.StatusOK)
 	return CustomResponse{}
 }
@@ -88,7 +90,7 @@ func (h Handlers) Login(res http.ResponseWriter, req *http.Request) CustomRespon
 		return CustomResponse{err: err, msg: "Не удалось распарсить запрос", code: http.StatusBadRequest}
 	}
 
-	userID, err := h.Storage.GetUserID(req.Context(), log.Login, log.Password)
+	userID, err := h.Storage.GetUserID(req.Context(), log.Login, auth.Hash(log.Password))
 	switch err {
 	case nil:
 		// pass
@@ -98,7 +100,7 @@ func (h Handlers) Login(res http.ResponseWriter, req *http.Request) CustomRespon
 		return CustomResponse{err: err, msg: "Внутренняя ошибка сервера", code: http.StatusInternalServerError}
 	}
 
-	auth.AddAuth(res, userID)
+	h.Auth.AddAuth(res, userID)
 	res.WriteHeader(http.StatusOK)
 	return CustomResponse{}
 }
@@ -121,10 +123,10 @@ func (h Handlers) AddOrder(res http.ResponseWriter, req *http.Request) CustomRes
 		return CustomResponse{err: err, msg: "Заказ уже был загружен", code: http.StatusOK}
 	}
 
-	order := storage.Order{
+	order := domain.Order{
 		UserID:  userID,
 		OrderID: orderID,
-		Status:  storage.NewOrderStatus,
+		Status:  domain.NewOrderStatus,
 	}
 	err = h.Storage.AddOrder(req.Context(), order)
 	if err != nil {
@@ -147,8 +149,7 @@ func (h Handlers) GetOrders(res http.ResponseWriter, req *http.Request) CustomRe
 
 	res.Header().Add("Content-Type", "application/json")
 	res.WriteHeader(http.StatusOK)
-	json.NewEncoder(res).Encode(orders) // TODO: скрыть заказы с accrual = 0
-	// TODO: Формат времени
+	json.NewEncoder(res).Encode(orders)
 	return CustomResponse{}
 }
 
@@ -199,7 +200,7 @@ func (h Handlers) Withdraw(res http.ResponseWriter, req *http.Request) CustomRes
 	if err != nil {
 		return CustomResponse{err: err, msg: "Ошибка при выполнении запроса", code: http.StatusInternalServerError}
 	}
-	wd := storage.Withdrawal{
+	wd := domain.Withdrawal{
 		OrderID: r.Order, // TOTHINK: должна ли эта ручка создавать новый заказ?
 		UserID:  userID,
 		Sum:     r.Sum,

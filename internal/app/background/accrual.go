@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"gophermart/internal/app/clients"
+	"gophermart/internal/app/domain"
 	"gophermart/internal/app/storage"
 	"net/http"
 	"time"
@@ -42,7 +43,7 @@ func (b BGAccrual) resetTicker(aErr clients.AccrualError) {
 	return
 }
 
-func (b BGAccrual) processOrder(ctx context.Context, order storage.Order) error {
+func (b BGAccrual) processOrder(ctx context.Context, order domain.Order) error {
 	resp, aErr := b.client.GetOrderInfo(order)
 	if aErr.Err != nil {
 		if aErr.Code == http.StatusTooManyRequests {
@@ -70,7 +71,7 @@ func (b BGAccrual) processOrder(ctx context.Context, order storage.Order) error 
 	return err
 }
 
-func (b BGAccrual) processOrders(ctx context.Context, orders []storage.Order) {
+func (b BGAccrual) processOrders(ctx context.Context, orders []domain.Order) {
 	for _, order := range orders {
 		select {
 		case <-b.Done:

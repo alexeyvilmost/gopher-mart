@@ -28,18 +28,24 @@ func StartServer() error {
 	}
 	bg := background.NewBackground(background.BGConfig{Storage: storage, AccrualAddress: cfg.AccrualAddress})
 
-	h := handlers.Handlers{Storage: storage}
-	a := auth.Auth{Storage: storage}
+	a := auth.Auth{Storage: storage, SecretKey: cfg.SecretKey}
+	h := handlers.Handlers{Storage: storage, Auth: a}
 
 	r := chi.NewRouter()
-	r.Post("/register", handlers.H(h.Register))
-	r.Post("/login", handlers.H(h.Login))
-	r.Post("/orders", a.WithAuth(handlers.H(h.AddOrder)))
-	r.Get("/orders", a.WithAuth(handlers.H(h.GetOrders))) // TOTHINK: Унифицировать вызов
-	r.Get("/balance", a.WithAuth(handlers.H(h.GetBalance)))
-	r.Post("/withdraw", a.WithAuth(handlers.H(h.Withdraw)))
-	r.Get("/withdrawals", a.WithAuth(handlers.H(h.GetWithdrawals)))
-	// TODO: правильные пути до ручек
+
+	r.Route("/api/user", func(r chi.Router) {
+		r.Post("/register", handlers.H(h.Register))
+		r.Post("/login", handlers.H(h.Login))
+
+		r.Group(func(r chi.Router) {
+			r.Use(a.WithAuth)
+			r.Post("/orders", handlers.H(h.AddOrder))
+			r.Get("/orders", handlers.H(h.GetOrders))
+			r.Get("/balance", handlers.H(h.GetBalance))
+			r.Post("/withdraw", handlers.H(h.Withdraw))
+			r.Get("/withdrawals", handlers.H(h.GetWithdrawals))
+		})
+	})
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 

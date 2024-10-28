@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"gophermart/internal/app/storage"
+	"hash/fnv"
 	"net/http"
 	"time"
 
@@ -16,13 +17,19 @@ type Claims struct {
 }
 
 type Auth struct {
-	Storage storage.Storage
+	Storage   storage.Storage
+	SecretKey string
 }
 
-const tokenExp = time.Hour * 3 // TODO: hide
-const secretKey = "supersecretkey"
+const tokenExp = time.Hour * 3
 
-func BuildJWTString(userID string) (string, error) {
+func Hash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
+}
+
+func (a Auth) BuildJWTString(userID string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenExp)),
@@ -30,7 +37,7 @@ func BuildJWTString(userID string) (string, error) {
 		UserID: userID,
 	})
 
-	tokenString, err := token.SignedString([]byte(secretKey))
+	tokenString, err := token.SignedString([]byte(a.SecretKey))
 	if err != nil {
 		return "", err
 	}
@@ -38,14 +45,14 @@ func BuildJWTString(userID string) (string, error) {
 	return tokenString, nil
 }
 
-func GetUserID(tokenString string) (string, error) {
+func (a Auth) GetUserID(tokenString string) (string, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
-			return []byte(secretKey), nil
+			return []byte(a.SecretKey), nil
 		})
 	if err != nil {
 		return "", err
@@ -59,8 +66,8 @@ func GetUserID(tokenString string) (string, error) {
 	return claims.UserID, nil
 }
 
-func AddAuth(w http.ResponseWriter, userID string) error {
-	token, err := BuildJWTString(userID)
+func (a Auth) AddAuth(w http.ResponseWriter, userID string) error {
+	token, err := a.BuildJWTString(userID)
 	if err != nil {
 		return err
 	}
@@ -76,7 +83,7 @@ func AddAuth(w http.ResponseWriter, userID string) error {
 	return nil
 }
 
-func (a Auth) WithAuth(h http.Handler) http.HandlerFunc {
+func (a Auth) WithAuth(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var token string
 		jwtAuth, err := r.Cookie("jwt_auth")
@@ -89,12 +96,22 @@ func (a Auth) WithAuth(h http.Handler) http.HandlerFunc {
 			return
 		}
 		token = jwtAuth.Value
-		// TOTHINK: Должна ли авторизация проверять существование пользователя?
 
-		userID, err := GetUserID(token)
+		userID, err := a.GetUserID(token)
 		if err != nil {
 			log.Error().Err(err).Msg("Error while get user_id from token")
 			http.Error(w, "Unexpected error while get user_id from token", http.StatusInternalServerError)
+			return
+		}
+		_, err = a.Storage.GetUser(r.Context(), userID)
+		if err != nil {
+			if err == storage.ErrEmpty {
+				log.Error().Err(err).Msg("No such user")
+				http.Error(w, "No such user", http.StatusUnauthorized)
+				return
+			}
+			log.Error().Err(err).Msg("Error while checking user existance")
+			http.Error(w, "Unexpected error while checking user existance", http.StatusInternalServerError)
 			return
 		}
 		r.Header.Set("x-user-id", userID)
