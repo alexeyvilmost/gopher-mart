@@ -32,7 +32,7 @@ func NewBGAccrual(accrualAddress string, storage storage.Storage) *BGAccrual {
 
 func (b BGAccrual) resetTicker(aErr clients.AccrualError) {
 	var newPeriod int
-	if aErr.MaxRequestsM < 1 {
+	if aErr.MaxRequestsM <= 1 {
 		newPeriod = int(time.Minute)
 	} else {
 		newPeriod = int(time.Minute) / (aErr.MaxRequestsM - 1)
